@@ -17,7 +17,6 @@ function initMap() {
       '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   }).addTo(map);
 
-  // Tenta geolocalização
   locateUser();
 }
 
@@ -44,6 +43,17 @@ function locateUser() {
   }
 }
 
+// Exibe indicador de carregamento
+function showLoading() {
+  document.getElementById("feedResultados").innerHTML = `
+    <div class="text-center py-4">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Carregando...</span>
+      </div>
+      <p class="mt-2">Buscando locais...</p>
+    </div>`;
+}
+
 // Busca locais no OpenStreetMap
 async function searchPlaces() {
   clearMarkers();
@@ -64,10 +74,9 @@ async function searchPlaces() {
     addMarkers(places);
   } catch (error) {
     console.error("Erro na busca:", error);
-    document.getElementById("feedResultados").innerHTML = `
-      <div class="alert alert-danger">
-        Erro ao buscar locais: ${error.message}
-      </div>`;
+    document.getElementById(
+      "feedResultados"
+    ).innerHTML = `<div class="alert alert-danger">Erro ao buscar locais: ${error.message}</div>`;
   }
 }
 
@@ -109,15 +118,17 @@ function displayResults(places) {
   const feed = document.getElementById("feedResultados");
 
   if (!places.elements || places.elements.length === 0) {
-    feed.innerHTML = `
-      <div class="alert alert-warning">
-        Nenhum local encontrado. Tente ampliar o raio de busca.
-      </div>`;
+    feed.innerHTML = `<div class="alert alert-warning">Nenhum local encontrado. Tente ampliar o raio de busca.</div>`;
     return;
   }
 
   feed.innerHTML = places.elements
     .map((place) => {
+      const lat = getPlaceLat(place);
+      const lng = getPlaceLng(place);
+
+      if (lat === null || lng === null) return ""; // Evita botões com valores indefinidos
+
       const name = place.tags?.name || "Local sem nome";
       const address = place.tags?.["addr:street"] || "Endereço não disponível";
       const type = getPlaceType(place.tags);
@@ -129,13 +140,12 @@ function displayResults(places) {
         <div class="d-flex justify-content-between align-items-center">
           <span class="badge bg-primary">${type}</span>
           <button class="btn btn-sm btn-outline-primary view-on-map" 
-                  data-lat="${getPlaceLat(place)}" 
-                  data-lng="${getPlaceLng(place)}">
+                  data-lat="${lat}" 
+                  data-lng="${lng}">
             Ver no mapa
           </button>
         </div>
-      </div>
-    `;
+      </div>`;
     })
     .join("");
 
@@ -149,16 +159,22 @@ function displayResults(places) {
   });
 }
 
-// Helper: Obtém coordenadas do local
+// Obtém coordenadas do local
 function getPlaceLat(place) {
-  return place.lat || place.center?.lat;
+  if (place.lat) return place.lat;
+  if (place.center?.lat) return place.center.lat;
+  console.warn("Latitude não encontrada para:", place);
+  return null;
 }
 
 function getPlaceLng(place) {
-  return place.lon || place.center?.lon;
+  if (place.lon) return place.lon;
+  if (place.center?.lon) return place.center.lon;
+  console.warn("Longitude não encontrada para:", place);
+  return null;
 }
 
-// Helper: Traduz tipos de lugares
+// Obtém tipo do local
 function getPlaceType(tags) {
   if (tags?.shop === "pet") return "Pet Shop";
   if (tags?.amenity === "veterinary") return "Veterinário";
@@ -171,7 +187,6 @@ function addMarkers(places) {
   places.elements.forEach((place) => {
     const lat = getPlaceLat(place);
     const lng = getPlaceLng(place);
-
     if (lat && lng) {
       const marker = L.marker([lat, lng]).addTo(map);
       const name = place.tags?.name || "Local sem nome";
@@ -185,17 +200,6 @@ function addMarkers(places) {
 function clearMarkers() {
   markers.forEach((marker) => map.removeLayer(marker));
   markers = [];
-}
-
-// Mostra loading
-function showLoading() {
-  document.getElementById("feedResultados").innerHTML = `
-    <div class="text-center py-4">
-      <div class="spinner-border text-primary" role="status">
-        <span class="visually-hidden">Carregando...</span>
-      </div>
-      <p class="mt-2">Buscando locais...</p>
-    </div>`;
 }
 
 // Inicialização
